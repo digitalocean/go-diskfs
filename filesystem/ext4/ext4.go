@@ -403,16 +403,17 @@ func Create(b backend.Storage, size, start, sectorsize int64, p *Params) (*FileS
 	raw := (int64(inodeCount) + blockGroups - 1) / blockGroups // round UP
 
 	// mkfs.ext4 rounds inodes_per_group to a multiple of inodes_per_block
-	// (blocksize/inode_size), not merely 8. Linux 6.1 computes s_itb_per_group
-	// with floor division and ext4lazyinit's used-block count with ceil; when
-	// inodes_per_group is not divisible by inodes_per_block those differ and
-	// group-0 init fails.
+	// (blocksize/inode_size) while keeping it a multiple of 8 for the inode
+	// bitmap. Linux 6.1 computes s_itb_per_group with floor division and
+	// ext4lazyinit's used-block count with ceil; when inodes_per_group is not
+	// divisible by inodes_per_block those differ and group-0 init fails.
 	inodeSize := int64(DefaultInodeSize)
 	inodesPerBlock := int64(blocksize) / inodeSize
-	inodesPerGroup := (raw + inodesPerBlock - 1) / inodesPerBlock * inodesPerBlock
-	if inodesPerGroup%inodesPerBlock != 0 {
-		return nil, fmt.Errorf("inodes_per_group %d not divisible by inodes_per_block %d", inodesPerGroup, inodesPerBlock)
+	align := inodesPerBlock
+	if align < 8 {
+		align = 8
 	}
+	inodesPerGroup := (raw + align - 1) / align * align
 
 	inodeCount = uint32(inodesPerGroup * blockGroups)
 
@@ -3065,13 +3066,6 @@ func (fs *FileSystem) initGroupDescriptorTables() error {
 
 		// Tables are fully zeroed above; tell the kernel lazyinit can skip them.
 		gd.flags.inodeTableZeroed = true
-		sbItbPerGroup := (uint64(fs.superblock.inodesPerGroup) * uint64(fs.superblock.inodeSize)) /
-			uint64(fs.superblock.blockSize)
-		if inodeTableBlocks > sbItbPerGroup {
-			gd.unusedInodes = uint32(inodeTableBlocks - sbItbPerGroup)
-		} else {
-			gd.unusedInodes = 0
-		}
 	}
 	return nil
 }
