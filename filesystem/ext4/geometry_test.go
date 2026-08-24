@@ -9,10 +9,10 @@ import (
 	"github.com/google/uuid"
 )
 
-// TestCreateInodesPerGroupDivisibleByInodesPerBlock guards against MVM-545:
-// go-diskfs used to round inodes_per_group to a multiple of 8 instead of
-// inodes_per_block (16 for 4 KiB blocks / 256-byte inodes). At 650 MiB that
-// yielded 6936 (% 16 == 8) and Linux 6.1 ext4lazyinit rejected group 0.
+// TestCreateInodesPerGroupDivisibleByInodesPerBlock verifies Create rounds
+// inodes_per_group to a multiple of inodes_per_block (16 for 4 KiB blocks /
+// 256-byte inodes), not merely 8. At 650 MiB, rounding to 8 yields 6936
+// (% 16 == 8) and Linux 6.1 ext4lazyinit rejects group 0.
 func TestCreateInodesPerGroupDivisibleByInodesPerBlock(t *testing.T) {
 	const size int64 = 650 * 1024 * 1024
 
